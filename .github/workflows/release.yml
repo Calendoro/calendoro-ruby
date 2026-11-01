@@ -1,0 +1,22 @@
+name: Release
+on:
+  push: { tags: ["v*"] }
+permissions: { contents: write, id-token: write, attestations: write }
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with: { ruby-version: "3.3" }
+      - run: test "v$(ruby -Ilib -e 'require "calendoro/version"; puts Calendoro::VERSION')" = "$GITHUB_REF_NAME"
+      - run: ruby -Ilib -Itest test/sdk_test.rb
+      - run: gem build calendoro.gemspec
+      - uses: actions/attest-build-provenance@v2
+        with: { subject-path: "calendoro-*.gem" }
+      - run: gh release create "$GITHUB_REF_NAME" calendoro-*.gem --generate-notes --verify-tag
+        env: { GH_TOKEN: "${{ github.token }}" }
+      - uses: rubygems/configure-rubygems-credentials@v1.0.0
+      - run: gem push calendoro-*.gem
